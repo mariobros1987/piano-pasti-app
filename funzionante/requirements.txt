@@ -3,5 +3,3 @@ pandas
 matplotlib
 altair
 openpyxl
-Pillow
-numpy
