@@ -316,10 +316,10 @@ def calcola_statistiche(df_day, persona):
         if isinstance(quantita, str) and "g" in quantita:
             try:
                 grammi = float(quantita.replace("g", ""))
-                if categoria in ["Cereali", "Proteine", "Frutta", "Verdura"]:
+                if categoria in ["Cereali", "Proteine", "Frutta", "Verdura", "Grassi"]:
                     fattore = grammi / 100.0
             except:
-                pass
+                pass # Keep as pass to avoid errors on non-gram values like "q.b."
         
         # Aggiungi i valori nutrizionali
         if categoria in categorie_nutrizionali:
@@ -327,6 +327,7 @@ def calcola_statistiche(df_day, persona):
                 stats[nutriente] += categorie_nutrizionali[categoria][nutriente] * fattore
     
     return stats
+
 # Carica dati esistenti
 df = carica_dati()
 
@@ -392,27 +393,27 @@ with tab1:
         st.header("Filtri e Operazioni")
         
         # Filtra per giorno
-        giorni = ["Tutti"] + sorted(df["Giorno"].unique().tolist())
-        giorno_selezionato = st.selectbox("Seleziona giorno", giorni)
+        giorni_options = ["Tutti"] + sorted(df["Giorno"].unique().tolist()) if not df.empty else ["Tutti"]
+        giorno_selezionato = st.selectbox("Seleziona giorno", giorni_options)
         
         st.markdown("---")
         
         # Aggiungi nuovo pasto
         with st.expander("Aggiungi Nuovo Pasto", expanded=False):
             giorni_settimana = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-            nuovo_giorno = st.selectbox("Giorno", giorni_settimana)
+            nuovo_giorno = st.selectbox("Giorno", giorni_settimana, key="new_day")
             
-            pasti = ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]
-            nuovo_pasto = st.selectbox("Pasto", pasti)
+            pasti_options = ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]
+            nuovo_pasto = st.selectbox("Pasto", pasti_options, key="new_meal")
             
-            categorie = ["Cereali", "Proteine", "Frutta", "Verdura", "Grassi", "Cereali/Grassi", "Altro"]
-            nuova_categoria = st.selectbox("Categoria", categorie)
+            categorie_options = ["Cereali", "Proteine", "Frutta", "Verdura", "Grassi", "Cereali/Grassi", "Altro"]
+            nuova_categoria = st.selectbox("Categoria", categorie_options, key="new_category")
             
-            nuovo_alimento = st.text_input("Alimento")
-            nuova_quantita_mario = st.text_input("Quantità Mario")
-            nuova_quantita_mariantonietta = st.text_input("Quantità Mariantonietta")
+            nuovo_alimento = st.text_input("Alimento", key="new_food")
+            nuova_quantita_mario = st.text_input("Quantità Mario", key="new_qty_mario")
+            nuova_quantita_mariantonietta = st.text_input("Quantità Mariantonietta", key="new_qty_mariantonietta")
             
-            if st.button("Aggiungi Pasto"):
+            if st.button("Aggiungi Pasto", key="add_meal_button"):
                 nuovo_pasto_dict = {
                     "Giorno": nuovo_giorno,
                     "Pasto": nuovo_pasto,
@@ -426,31 +427,31 @@ with tab1:
                 st.experimental_rerun()
 
     # Filtra il dataframe in base al giorno selezionato
-    if giorno_selezionato != "Tutti":
+    if not df.empty and giorno_selezionato != "Tutti":
         df_filtrato = df[df["Giorno"] == giorno_selezionato]
     else:
         df_filtrato = df
 
     # Mostra il piano pasti per ogni giorno della settimana
-    giorni_settimana = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+    giorni_settimana_display = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
     if giorno_selezionato != "Tutti":
         giorni_da_mostrare = [giorno_selezionato]
     else:
-        giorni_da_mostrare = [g for g in giorni_settimana if g in df["Giorno"].unique()]
+        giorni_da_mostrare = [g for g in giorni_settimana_display if not df.empty and g in df["Giorno"].unique()]
 
-    for giorno in giorni_da_mostrare:
-        st.header(giorno)
-        df_giorno = df_filtrato[df_filtrato["Giorno"] == giorno]
+    for giorno_iter in giorni_da_mostrare: # Renamed to avoid conflict
+        st.header(giorno_iter)
+        df_giorno = df_filtrato[df_filtrato["Giorno"] == giorno_iter]
         
         # Verifica se è giorno di allenamento
-        if giorno in ["Martedì", "Giovedì", "Sabato"]:
+        if giorno_iter in ["Martedì", "Giovedì", "Sabato"]:
             st.markdown("**🏃‍♂️ Giorno di allenamento calcetto**")
         
         # Organizza per pasto
-        for pasto in ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]:
-            df_pasto = df_giorno[df_giorno["Pasto"] == pasto]
+        for pasto_iter in ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]: # Renamed to avoid conflict
+            df_pasto = df_giorno[df_giorno["Pasto"] == pasto_iter]
             if not df_pasto.empty:
-                with st.expander(f"{pasto}", expanded=True):
+                with st.expander(f"{pasto_iter}", expanded=True):
                     # Crea colonne per le tabelle
                     cols = st.columns([2, 1, 1, 1])
                     cols[0].write("**Alimento**")
@@ -459,116 +460,124 @@ with tab1:
                     cols[3].write("**Mariantonietta**")
                     
                     for _, row in df_pasto.iterrows():
-                        cols = st.columns([2, 1, 1, 1])
-                        cols[0].write(row["Alimento"])
-                        cols[1].write(row["Categoria"])
-                        cols[2].write(row["Quantità_Mario"])
-                        cols[3].write(row["Quantità_Mariantonietta"])
+                        cols_data = st.columns([2, 1, 1, 1]) # Renamed to avoid conflict
+                        cols_data[0].write(row["Alimento"])
+                        cols_data[1].write(row["Categoria"])
+                        cols_data[2].write(row["Quantità_Mario"])
+                        cols_data[3].write(row["Quantità_Mariantonietta"])
 
 with tab2:
     st.title("Statistiche Nutrizionali")
     
     # Seleziona giorno e persona per le statistiche
-    col1, col2 = st.columns(2)
+    col_stats1, col_stats2 = st.columns(2) # Renamed to avoid conflict
     
-    with col1:
+    with col_stats1:
+        giorno_stats_options = sorted(df["Giorno"].unique().tolist()) if not df.empty else []
         giorno_stats = st.selectbox("Seleziona giorno per statistiche", 
-                                   sorted(df["Giorno"].unique().tolist()), key="stats_day")
+                                   giorno_stats_options, key="stats_day_select")
     
-    with col2:
-        persona = st.radio("Seleziona persona", ["Mario", "Mariantonietta"])
+    with col_stats2:
+        persona_stats = st.radio("Seleziona persona", ["Mario", "Mariantonietta"], key="stats_person_select") # Renamed
     
     # Filtra per il giorno selezionato
-    df_day = df[df["Giorno"] == giorno_stats]
-    
-    if not df_day.empty:
-        # Calcola statistiche
-        stats = calcola_statistiche(df_day, persona)
+    if giorno_stats: # Check if a day is selected
+        df_day_stats = df[df["Giorno"] == giorno_stats] # Renamed
         
-        # Mostra statistiche
-        st.subheader(f"Valori nutrizionali approssimativi per {persona} - {giorno_stats}")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Calorie", f"{int(stats['calorie'])} kcal")
-        col2.metric("Proteine", f"{int(stats['proteine'])} g")
-        col3.metric("Carboidrati", f"{int(stats['carboidrati'])} g")
-        col4.metric("Grassi", f"{int(stats['grassi'])} g")
-        
-        # Crea un grafico a torta per i macronutrienti
-        st.subheader("Distribuzione Macronutrienti")
-        fig, ax = plt.subplots()
-        labels = ['Proteine', 'Carboidrati', 'Grassi']
-        values = [stats['proteine'] * 4, stats['carboidrati'] * 4, stats['grassi'] * 9]  # Calorie per grammo
-        ax.pie(values, labels=labels, autopct='%1.1f%%')
-        ax.axis('equal')
-        st.pyplot(fig)
-        
-        # Crea un grafico per le calorie per pasto
-        st.subheader("Calorie per Pasto")
-        pasti_calorie = {}
-        for pasto in ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]:
-            df_pasto = df_day[df_day["Pasto"] == pasto]
-            if not df_pasto.empty:
-                pasto_stats = calcola_statistiche(df_pasto, persona)
-                pasti_calorie[pasto] = pasto_stats["calorie"]
-        
-        pasti_df = pd.DataFrame({
-            'Pasto': list(pasti_calorie.keys()),
-            'Calorie': list(pasti_calorie.values())
-        })
-        
-        chart = alt.Chart(pasti_df).mark_bar().encode(
-            x='Pasto',
-            y='Calorie',
-            color='Pasto'
-        ).properties(
-            width=600
-        )
-        
-        st.altair_chart(chart)
+        if not df_day_stats.empty:
+            # Calcola statistiche
+            stats = calcola_statistiche(df_day_stats, persona_stats)
+            
+            # Mostra statistiche
+            st.subheader(f"Valori nutrizionali approssimativi per {persona_stats} - {giorno_stats}")
+            
+            col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4) # Renamed
+            col_metric1.metric("Calorie", f"{int(stats['calorie'])} kcal")
+            col_metric2.metric("Proteine", f"{int(stats['proteine'])} g")
+            col_metric3.metric("Carboidrati", f"{int(stats['carboidrati'])} g")
+            col_metric4.metric("Grassi", f"{int(stats['grassi'])} g")
+            
+            # Crea un grafico a torta per i macronutrienti
+            st.subheader("Distribuzione Macronutrienti")
+            fig_macros, ax_macros = plt.subplots() # Renamed
+            labels_macros = ['Proteine', 'Carboidrati', 'Grassi'] # Renamed
+            values_macros = [stats['proteine'] * 4, stats['carboidrati'] * 4, stats['grassi'] * 9]  # Calorie per grammo
+            ax_macros.pie(values_macros, labels=labels_macros, autopct='%1.1f%%')
+            ax_macros.axis('equal')
+            st.pyplot(fig_macros)
+            
+            # Crea un grafico per le calorie per pasto
+            st.subheader("Calorie per Pasto")
+            pasti_calorie = {}
+            for pasto_calorie_iter in ["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]: # Renamed
+                df_pasto_calorie = df_day_stats[df_day_stats["Pasto"] == pasto_calorie_iter] # Renamed
+                if not df_pasto_calorie.empty:
+                    pasto_stats_calorie = calcola_statistiche(df_pasto_calorie, persona_stats) # Renamed
+                    pasti_calorie[pasto_calorie_iter] = pasto_stats_calorie["calorie"]
+            
+            if pasti_calorie: # Check if dictionary is not empty
+                pasti_df_calorie = pd.DataFrame({ # Renamed
+                    'Pasto': list(pasti_calorie.keys()),
+                    'Calorie': list(pasti_calorie.values())
+                })
+                
+                chart_calories = alt.Chart(pasti_df_calorie).mark_bar().encode( # Renamed
+                    x='Pasto',
+                    y='Calorie',
+                    color='Pasto'
+                ).properties(
+                    width=600
+                )
+                st.altair_chart(chart_calories)
+            else:
+                st.write("Nessun dato calorico per i pasti selezionati.")
+
+        else:
+            st.warning(f"Nessun dato disponibile per {giorno_stats}")
     else:
-        st.warning(f"Nessun dato disponibile per {giorno_stats}")
+        st.info("Seleziona un giorno per visualizzare le statistiche.")
+
 
 with tab3:
     st.title("Gestione Dati")
     
-    col1, col2 = st.columns(2)
+    col_gest1, col_gest2 = st.columns(2) # Renamed
     
-    with col1:
+    with col_gest1:
         st.subheader("Genera Piano per tutta la Settimana")
         st.markdown("""
         Questa funzione genera un piano alimentare settimanale completo per Mario e Mariantonietta,
         rispettando le indicazioni del nutrizionista e considerando i giorni di allenamento calcetto.
         """)
         
-        if st.button("Genera Piano Settimanale Personalizzato"):
-            nuovo_df = genera_pasti_settimana()
-            df = nuovo_df
+        if st.button("Genera Piano Settimanale Personalizzato", key="generate_plan_button"):
+            nuovo_df_generated = genera_pasti_settimana() # Renamed
+            df = nuovo_df_generated # Update main df
             salva_dati(df)
             st.success("Piano settimanale personalizzato generato con successo!")
             st.experimental_rerun()
     
-    with col2:
+    with col_gest2:
         st.subheader("Eliminazione Pasti")
         
-        if st.checkbox("Mostra opzioni di eliminazione"):
+        if st.checkbox("Mostra opzioni di eliminazione", key="show_delete_options_checkbox"):
             st.warning("Seleziona i pasti da eliminare:")
-            delete_rows = []
+            delete_rows_indices = [] # Renamed
             
-            for i, row in df.iterrows():
-                label = f"{row['Giorno']} - {row['Pasto']} - {row['Alimento']}"
-                if st.checkbox(label, key=f"del_{i}"):
-                    delete_rows.append(i)
+            for i_del, row_del in df.iterrows(): # Renamed iterators
+                label_del = f"{row_del['Giorno']} - {row_del['Pasto']} - {row_del['Alimento']}" # Renamed
+                if st.checkbox(label_del, key=f"del_row_{i_del}"):
+                    delete_rows_indices.append(i_del)
             
-            if delete_rows and st.button("Elimina Selezionati"):
-                df = df.drop(delete_rows).reset_index(drop=True)
+            if delete_rows_indices and st.button("Elimina Selezionati", key="delete_selected_button"):
+                df = df.drop(delete_rows_indices).reset_index(drop=True)
                 salva_dati(df)
                 st.experimental_rerun()
     
     st.markdown("---")
     
     st.subheader("Esporta Dati")
-    if st.button("Esporta Excel"):
+    if st.button("Esporta Excel", key="export_excel_button"):
         salva_dati(df)
         st.success(f"File Excel salvato come: pasti_settimanali.xlsx")
         
@@ -580,9 +589,9 @@ with tab4:
     st.title("Informazioni sulla Dieta")
     
     # Aggiungo un selettore per scegliere la persona
-    persona_dieta = st.radio("Seleziona persona", ["Informazioni Generali", "Mario", "Mariantonietta"], horizontal=True)
+    persona_dieta_select = st.radio("Seleziona persona", ["Informazioni Generali", "Mario", "Mariantonietta"], horizontal=True, key="diet_info_person_select") # Renamed
     
-    if persona_dieta == "Informazioni Generali":
+    if persona_dieta_select == "Informazioni Generali":
         st.header("Piano Alimentare Personalizzato")
         
         st.markdown("""
@@ -626,9 +635,9 @@ with tab4:
         
         st.header("Alimenti da ridurre")
         
-        col1, col2 = st.columns(2)
+        col_reduce1, col_reduce2 = st.columns(2) # Renamed
         
-        with col1:
+        with col_reduce1:
             st.markdown("""
             ### Da limitare
             
@@ -641,7 +650,7 @@ with tab4:
             - Acidi grassi saturi animali (latte, formaggi, burro normale, salumi)
             """)
         
-        with col2:
+        with col_reduce2:
             st.markdown("""
             ### Da preferire
             
@@ -655,7 +664,7 @@ with tab4:
             - Uova di galline locali
             """)
     
-    elif persona_dieta == "Mario":
+    elif persona_dieta_select == "Mario":
         st.header("Piano Alimentare Personalizzato di Mario")
         
         st.markdown("""
@@ -732,9 +741,9 @@ with tab4:
         
         st.subheader("Piano settimanale per Mariantonietta")
         
-        tab_colazione, tab_spuntino, tab_pranzo, tab_merenda, tab_cena = st.tabs(["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"])
+        tab_colazione_ma, tab_spuntino_ma, tab_pranzo_ma, tab_merenda_ma, tab_cena_ma = st.tabs(["Colazione", "Spuntino", "Pranzo", "Merenda", "Cena"]) # Renamed
         
-        with tab_colazione:
+        with tab_colazione_ma:
             st.markdown("""
             ### COLAZIONE
             
@@ -749,7 +758,7 @@ with tab4:
             - 40g di olive verdi denocciolate o 10g di cocco disidratato
             """)
         
-        with tab_spuntino:
+        with tab_spuntino_ma:
             st.markdown("""
             ### SPUNTINO MATTINA
             
@@ -794,7 +803,7 @@ with tab4:
             - 10g (1 cucchiaio) di olio EVO
             """)
         
-        with tab_pranzo:
+        with tab_pranzo_ma:
             st.markdown("""
             ### PRANZO
             
@@ -810,7 +819,7 @@ with tab4:
             - 40g di olive verdi denocciolate o 10g di cocco disidratato
             """)
         
-        with tab_merenda:
+        with tab_merenda_ma:
             st.markdown("""
             ### MERENDA
             
@@ -819,7 +828,7 @@ with tab4:
             - o crostini di pane (40g) con olio (un cucchiaino - 5g) e origano
             """)
         
-        with tab_cena:
+        with tab_cena_ma:
             st.markdown("""
             ### CENA
             
@@ -874,377 +883,3 @@ with tab4:
         ### Integrazione consigliata
         - Colex Mu: 1 compressa al giorno, la sera dopo cena per 3 mesi
         """)
-# --- Definizione database ricette ---
-ricette_db = [
-    {"nome": "Pasta al Pomodoro", "ingredienti": ["Pasta integrale", "Pomodoro", "Olio EVO"], "tipo": ["Pranzo"]},
-    {"nome": "Pollo alla Griglia", "ingredienti": ["Carne magra (pollo)", "Olio EVO", "Spezie"], "tipo": ["Pranzo", "Cena"]},
-    {"nome": "Merluzzo al Forno", "ingredienti": ["Pesce (merluzzo)", "Olio EVO", "Patate"], "tipo": ["Pranzo"]},
-    {"nome": "Insalata di Verdure", "ingredienti": ["Verdure miste", "Olio EVO"], "tipo": ["Pranzo", "Cena"]},
-    {"nome": "Tacchino con Patate", "ingredienti": ["Carne magra (tacchino)", "Patate", "Olio EVO"], "tipo": ["Cena"]},
-    {"nome": "Affettato magro e Pane", "ingredienti": ["Affettato magro", "Pane"], "tipo": ["Merenda", "Cena"]},
-    {"nome": "Pesce magro con Verdure", "ingredienti": ["Pesce magro", "Verdura cotta-cruda", "Olio EVO"], "tipo": ["Cena"]},
-    {"nome": "Yogurt e Fragole", "ingredienti": ["Yogurt greco", "Fragole"], "tipo": ["Colazione", "Merenda"]}
-]
-
-# --- Funzione per suggerire ricette in base agli ingredienti disponibili ---
-def suggerisci_ricette(ingredienti_giorno, tipo_pasto):
-    suggerite = []
-    for ricetta in ricette_db:
-        if tipo_pasto in ricetta["tipo"] and all(ing in ingredienti_giorno for ing in ricetta["ingredienti"]):
-            suggerite.append(ricetta["nome"])
-    return suggerite
-
-# --- UI Streamlit per selezione ricette pranzo/cena ---
-st.sidebar.title("Selezione Ricette per la Settimana")
-giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-
-# Carica o genera dati pasti
-if os.path.exists("pasti_settimanali.xlsx"):
-    df_pasti = pd.read_excel("pasti_settimanali.xlsx")
-else:
-    df_pasti = genera_pasti_settimana()
-
-scelte_utente = {}
-for giorno in giorni:
-    st.sidebar.markdown(f"### {giorno}")
-    # Ingredienti disponibili per il giorno
-    ingredienti_giorno = df_pasti[df_pasti["Giorno"] == giorno]["Alimento"].unique().tolist()
-    # Ricette suggerite per pranzo
-    ricette_pranzo = suggerisci_ricette(ingredienti_giorno, "Pranzo")
-    scelta_pranzo = st.sidebar.selectbox(f"Scegli ricetta pranzo per {giorno}", ricette_pranzo, key=f"pranzo_{giorno}") if ricette_pranzo else "Nessuna ricetta disponibile"
-    # Ricette suggerite per cena
-    ricette_cena = suggerisci_ricette(ingredienti_giorno, "Cena")
-    scelta_cena = st.sidebar.selectbox(f"Scegli ricetta cena per {giorno}", ricette_cena, key=f"cena_{giorno}") if ricette_cena else "Nessuna ricetta disponibile"
-    scelte_utente[giorno] = {"Pranzo": scelta_pranzo, "Cena": scelta_cena}
-
-# Visualizza riepilogo scelte
-st.write("## Riepilogo Ricette Scelte per la Settimana")
-st.table(pd.DataFrame.from_dict(scelte_utente, orient="index"))
-
-# Visualizza lista della spesa e ricette
-st.write("## Lista della Spesa e Ricette")
-st.write("## Ricette per Pranzo e Cena")
-st.write("## Lista della Spesa e Ricette")
-
-# Funzione per generare lista della spesa
-def genera_lista_spesa(df):
-    # Raggruppa per alimento e somma le quantità
-    lista_spesa = df.groupby('Alimento').agg({
-        'Quantità_Mario': 'sum',
-        'Quantità_Mariantonietta': 'sum'
-    }).reset_index()
-    return lista_spesa
-
-# Funzione per visualizzare ricette per giorno e pasto
-def visualizza_ricette(df):
-    # Filtra solo pranzi e cene
-    ricette = df[df['Pasto'].isin(['Pranzo', 'Cena'])]
-    return ricette
-
-# Funzione per visualizzare ricette di verdure e contorni
-def visualizza_ricette_verdure():
-    ricette_verdure = {
-        "Insalata mista": {
-            "ingredienti": ["Lattuga", "Rucola", "Pomodorini", "Carote", "Cetrioli"],
-            "preparazione": "Lavare e tagliare tutte le verdure. Condire con olio EVO, sale e aceto balsamico a piacere."
-        },
-        "Verdure grigliate": {
-            "ingredienti": ["Zucchine", "Melanzane", "Peperoni", "Radicchio"],
-            "preparazione": "Tagliare le verdure a fette, spennellare con olio EVO e grigliare fino a doratura. Condire con sale e erbe aromatiche."
-        },
-        "Caponata di verdure": {
-            "ingredienti": ["Melanzane", "Sedano", "Cipolla", "Pomodori", "Olive verdi"],
-            "preparazione": "Tagliare le verdure a cubetti, soffriggere la cipolla, aggiungere le altre verdure e cuocere per 20-25 minuti. Condire con sale e basilico."
-        },
-        "Insalata di finocchi": {
-            "ingredienti": ["Finocchi", "Arance", "Olive nere"],
-            "preparazione": "Affettare finemente i finocchi, aggiungere spicchi d'arancia e olive. Condire con olio EVO e sale."
-        },
-        "Verdure al vapore": {
-            "ingredienti": ["Broccoli", "Cavolfiori", "Carote", "Fagiolini"],
-            "preparazione": "Cuocere le verdure al vapore per 10-15 minuti. Condire con olio EVO, sale e limone."
-        }
-    }
-    return ricette_verdure
-
-# Funzione per visualizzare ricette per pranzo e cena
-def visualizza_ricette_pasti():
-    ricette_pasti = {
-        "Pranzo": {
-            "Pasta integrale con merluzzo": {
-                "ingredienti": ["Pasta integrale (90g/70g)", "Merluzzo (150g/120g)", "Verdure miste (200g)", "Olio EVO (10g)", "Aglio", "Prezzemolo"],
-                "preparazione": "1. Cuocere la pasta in acqua bollente salata\n2. In una padella, rosolare l'aglio in olio EVO\n3. Aggiungere il merluzzo a pezzetti e cuocere per 5-6 minuti\n4. Unire le verdure miste e cuocere per altri 3-4 minuti\n5. Scolare la pasta e saltarla nel condimento\n6. Completare con prezzemolo fresco"
-            },
-            "Pasta integrale con pollo": {
-                "ingredienti": ["Pasta integrale (90g/70g)", "Petto di pollo (120g/100g)", "Verdure miste (200g)", "Olio EVO (10g)", "Rosmarino", "Salvia"],
-                "preparazione": "1. Cuocere la pasta in acqua bollente salata\n2. Tagliare il pollo a strisce e condirlo con erbe aromatiche\n3. In una padella, scaldare l'olio e cuocere il pollo\n4. Aggiungere le verdure e cuocere per 5-6 minuti\n5. Scolare la pasta e unirla al condimento\n6. Saltare il tutto per un minuto"
-            }
-        },
-        "Cena": {
-            "Tacchino con patate": {
-                "ingredienti": ["Fettine di tacchino (150g/180g)", "Patate (200g/80g)", "Verdure cotte-crude (200g)", "Olio EVO (10g)", "Origano", "Rosmarino"],
-                "preparazione": "1. Tagliare le patate a spicchi e condirle con olio e rosmarino\n2. Infornare le patate a 200°C per 20-25 minuti\n3. Grigliare le fettine di tacchino 3-4 minuti per lato\n4. Preparare le verdure cotte-crude\n5. Servire con un filo d'olio e origano"
-            },
-            "Pesce magro al forno": {
-                "ingredienti": ["Pesce magro (200g)", "Pangrattato (q.b.)", "Verdura cotta-cruda (200g)", "Olio EVO (10g)", "Limone", "Prezzemolo"],
-                "preparazione": "1. Pulire il pesce e asciugarlo\n2. Condire con olio, sale e pangrattato\n3. Infornare a 180°C per 15-20 minuti\n4. Preparare le verdure come contorno\n5. Servire con succo di limone e prezzemolo fresco"
-            },
-            "Carne magra alla griglia": {
-                "ingredienti": ["Carne magra (150g)", "Verdure cotte-crude (200g)", "Olio EVO (10g)", "Rosmarino", "Salvia"],
-                "preparazione": "1. Marinare la carne con erbe aromatiche\n2. Grigliare la carne secondo la cottura desiderata\n3. Preparare le verdure come contorno\n4. Servire con un filo d'olio a crudo"
-            }
-        }
-    }
-    return ricette_pasti
-
-# Funzione per caricare i dati
-def carica_dati():
-    if os.path.exists("pasti_settimanali.xlsx"):
-        return pd.read_excel("pasti_settimanali.xlsx")
-    else:
-        return pd.DataFrame(columns=["Giorno", "Pasto", "Categoria", "Alimento", "Quantità_Mario", "Quantità_Mariantonietta"])
-
-# Funzione per salvare i dati
-def salva_dati(df):
-    df.to_excel("pasti_settimanali.xlsx", index=False)
-    st.success("Dati salvati con successo!")
-
-# Funzione per generare pasti per tutta la settimana
-def genera_pasti_settimana():
-    # Definizione piano pasti settimanale
-    piano_pasti = []
-    
-    # Giorni della settimana
-    giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-    
-    # Giorni di allenamento calcetto
-    giorni_allenamento = ["Martedì", "Giovedì", "Sabato"]
-    
-    for giorno in giorni:
-        # COLAZIONE (uguale per tutti i giorni)
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Colazione", "Categoria": "Cereali",
-            "Alimento": "Fiocchi d'avena", "Quantità_Mario": "40g", "Quantità_Mariantonietta": "30g"
-        })
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Colazione", "Categoria": "Proteine",
-            "Alimento": "Yogurt greco", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "125g"
-        })
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Colazione", "Categoria": "Frutta",
-            "Alimento": "Fragole", "Quantità_Mario": "50g", "Quantità_Mariantonietta": "50g"
-        })
-        
-        # SPUNTINO METÀ MATTINA
-        if giorno in giorni_allenamento:
-            # Giorni di allenamento
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Spuntino", "Categoria": "Cereali",
-                "Alimento": "Pane", "Quantità_Mario": "40g", "Quantità_Mariantonietta": "30g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Spuntino", "Categoria": "Grassi",
-                "Alimento": "Burro d'arachidi", "Quantità_Mario": "20g", "Quantità_Mariantonietta": "15g"
-            })
-        else:
-            # Giorni normali
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Spuntino", "Categoria": "Grassi",
-                "Alimento": "Olive verdi", "Quantità_Mario": "80g", "Quantità_Mariantonietta": "60g"
-            })
-        
-        # PRANZO
-        if giorno in giorni_allenamento:
-            # Giorni di allenamento
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Cereali",
-                "Alimento": "Pasta integrale", "Quantità_Mario": "90g", "Quantità_Mariantonietta": "70g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Proteine",
-                "Alimento": "Pesce (merluzzo)", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "120g"
-            })
-        else:
-            # Giorni normali
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Cereali",
-                "Alimento": "Pasta integrale", "Quantità_Mario": "90g", "Quantità_Mariantonietta": "70g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Proteine",
-                "Alimento": "Carne magra (pollo)", "Quantità_Mario": "120g", "Quantità_Mariantonietta": "100g"
-            })
-        
-        # Comune per tutti i pranzi
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Verdura",
-            "Alimento": "Verdure miste", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-        })
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Pranzo", "Categoria": "Grassi",
-            "Alimento": "Olio EVO", "Quantità_Mario": "10g", "Quantità_Mariantonietta": "10g"
-        })
-        
-        # MERENDA POMERIGGIO
-        if giorno in giorni_allenamento:
-            # Giorni di allenamento (1.5-2h prima dell'allenamento)
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Merenda", "Categoria": "Cereali",
-                "Alimento": "Panino", "Quantità_Mario": "50g", "Quantità_Mariantonietta": "40g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Merenda", "Categoria": "Proteine",
-                "Alimento": "Affettato magro", "Quantità_Mario": "40g", "Quantità_Mariantonietta": "30g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Merenda", "Categoria": "Frutta",
-                "Alimento": "Banana (10 min prima)", "Quantità_Mario": "1 media", "Quantità_Mariantonietta": "1 piccola"
-            })
-        else:
-            # Giorni normali
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Merenda", "Categoria": "Proteine",
-                "Alimento": "Yogurt greco", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "125g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Merenda", "Categoria": "Grassi",
-                "Alimento": "Burro d'arachidi", "Quantità_Mario": "20g", "Quantità_Mariantonietta": "15g"
-            })
-        
-        # CENA - seguendo la tabella di Mariantonietta e facendo coincidere gli alimenti
-        if giorno == "Lunedì":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Cereali",
-                "Alimento": "Pane tostato/Patate", "Quantità_Mario": "70g/200g", "Quantità_Mariantonietta": "40g/80g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Carne magra (tacchino)", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "180g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdure cotte-crude", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        elif giorno == "Martedì":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Cereali",
-                "Alimento": "Pane/Pangrattato", "Quantità_Mario": "70g", "Quantità_Mariantonietta": "40g/4 cucchiai"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Pesce magro", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdura cotta-cruda", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        elif giorno == "Mercoledì":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Carne magra", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "150g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Insalata valeriana e finocchi", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        elif giorno == "Giovedì":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Affettato magro", "Quantità_Mario": "120g", "Quantità_Mariantonietta": "120g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdura cotta-cruda", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        elif giorno == "Venerdì":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Cereali",
-                "Alimento": "Pane tostato/Patate", "Quantità_Mario": "70g/200g", "Quantità_Mariantonietta": "40g/80g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Carne magra", "Quantità_Mario": "150g", "Quantità_Mariantonietta": "180g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdure cotte-crude", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        elif giorno == "Sabato":
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Carne magra o Pesce magro", "Quantità_Mario": "150g/200g", "Quantità_Mariantonietta": "150g/200g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdura cotta", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Note",
-                "Alimento": "Dopo 2 settimane: CENA LIBERA", "Quantità_Mario": "", "Quantità_Mariantonietta": ""
-            })
-        else:  # Domenica
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Proteine",
-                "Alimento": "Carne magra o Pesce magro", "Quantità_Mario": "150g/200g", "Quantità_Mariantonietta": "150g/200g"
-            })
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Verdura",
-                "Alimento": "Verdura cotta", "Quantità_Mario": "200g", "Quantità_Mariantonietta": "200g"
-            })
-        
-        # Olio per tutte le cene
-        piano_pasti.append({
-            "Giorno": giorno, "Pasto": "Cena", "Categoria": "Grassi",
-            "Alimento": "Olio EVO", "Quantità_Mario": "10g", "Quantità_Mariantonietta": "10g"
-        })
-        
-        # Condimento per alcune cene
-        if giorno in ["Lunedì", "Venerdì"]:
-            piano_pasti.append({
-                "Giorno": giorno, "Pasto": "Cena", "Categoria": "Condimento",
-                "Alimento": "Origano e/o spezie", "Quantità_Mario": "q.b.", "Quantità_Mariantonietta": "q.b."
-            })
-    
-    # Crea il DataFrame
-    nuovo_df = pd.DataFrame(piano_pasti)
-    return nuovo_df
-
-# Inizializza le statistiche nutrizionali (esempio)
-categorie_nutrizionali = {
-    "Cereali": {"calorie": 120, "proteine": 3, "carboidrati": 25, "grassi": 1},
-    "Proteine": {"calorie": 150, "proteine": 20, "carboidrati": 2, "grassi": 8},
-    "Frutta": {"calorie": 80, "proteine": 1, "carboidrati": 20, "grassi": 0},
-    "Verdura": {"calorie": 40, "proteine": 2, "carboidrati": 8, "grassi": 0},
-    "Grassi": {"calorie": 90, "proteine": 0, "carboidrati": 0, "grassi": 10},
-    "Cereali/Grassi": {"calorie": 200, "proteine": 5, "carboidrati": 20, "grassi": 12},
-    "Altro": {"calorie": 100, "proteine": 5, "carboidrati": 15, "grassi": 5},
-}
-
-# Funzione per calcolare statistiche nutrizionali
-def calcola_statistiche(df_day, persona):
-    stats = {"calorie": 0, "proteine": 0, "carboidrati": 0, "grassi": 0}
-    
-    for _, row in df_day.iterrows():
-        categoria = row["Categoria"]
-        quantita = row[f"Quantità_{persona}"]
-        
-        # Calcola un fattore di scala basato sulla quantità (semplificato)
-        fattore = 1.0
-        if isinstance(quantita, str) and "g" in quantita:
-            try:
-                grammi = float(quantita.replace("g", ""))
-                if categoria in ["Cereali", "Proteine", "Frutta", "Verdura", "Grassi"]:
-                    fattore = grammi / 100.0
-            except:
-                pass
-        
-        # Aggiungi i valori nutrizionali
-        if categoria in categorie_nutrizionali:
-            for nutriente in stats:
-                stats[nutriente] += categorie_nutrizionali[categoria][nutriente] * fattore
-    
-    return stats
-
-# Carica dati esistenti
-df = carica_dati()
-
